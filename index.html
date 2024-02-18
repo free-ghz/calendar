@@ -89,7 +89,8 @@
                 let lineHere = activeLines.filter(l => l.col == i)
                 if (lineHere.length > 0) {
                     let lineSpan = document.createElement("span")
-                    lineSpan.className = lineHere[0].type
+                    lineSpan.classList.add(lineHere[0].type)
+                    lineSpan.classList.add("line")
                     lineSpan.innerHTML = lineChar
                     let isLineStart = (lineHere[0].start && date.getTime() == lineHere[0].start.getTime())
                     let isLineEnd =   (lineHere[0].end   && date.getTime() == lineHere[0].end.getTime())
@@ -97,6 +98,10 @@
                         lineSpan.innerHTML = lineHere[0].title
                         i += lineHere[0].title.length - 1 // - 1 to account for ++ in loop
                     }
+                    let tooltip = document.createElement("span")
+                    tooltip.className = "data"
+                    tooltip.innerHTML = lineHere[0].title
+                    lineSpan.appendChild(tooltip)
                     span.appendChild(lineSpan)
                 } else {
                     span.appendChild(document.createTextNode(" "))
@@ -255,15 +260,6 @@
             color: var(--legend);
         }
 
-        .head1,
-        .head2,
-        .head3,
-        .head4,
-        .head5,
-        .head6 {
-            color: #000;
-        }
-
         .guide {
             background-color: var(--semidark);
         }
@@ -310,6 +306,28 @@
             background: none;
             text-decoration: underline;
         }
+
+        .line {
+            color: #000;
+            position: relative;
+        }
+
+        /* stole this tooltip shit from w3schools */
+        .data {
+            visibility: hidden;
+            width: 120px;
+            background-color: black;
+            color: #fff;
+            text-align: center;
+            padding: 5px 0;
+            border-radius: 6px;
+            
+            position: absolute;
+            z-index: 1;
+        }
+        .line:hover .data {
+            visibility: visible;
+        }
     </style>
 </head>
 
@@ -317,7 +335,7 @@
     <pre class="cool">
       ____    __   _  _ 
    __/ __ \ _/ _\ ( \/ ) tiny calendar for slow movements
-  ( \__  )(/    \ )  (   
+  ( \__  )(/    \ )  (   see <a href="research_cloud.html">cloud</a>
   (__\___/ \_)\_/(_/\_)</pre>
     <pre class="sludge"></pre>
 </body>
