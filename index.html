@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Timerliner TWO!!!</title>
+    <script type="text/javascript">
+        let lineChar = " "
+        let padding = 10
+
+        let earliest
+        let latest
+        let startDate
+        let endDate
+        let lines = []
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+        function lineTitleOverlaps(a, b) {
+            // same start date
+            if (!!a.start && !!b.start && (a.start.getTime() == b.start.getTime())) return true
+            // a start is b end
+            if (!!a.start && !!b.end && (a.start.getTime() == b.end.getTime())) return true
+            // a end is b start
+            if (!!a.end && !!b.start && (a.end.getTime() == b.start.getTime())) return true
+            // same end date
+            if (!!a.end && !!b.end && (a.end.getTime() == b.end.getTime())) return true
+            return false
+        }
+        function registerLine(item) {
+            let clashingLines = lines
+                .filter(l =>
+                    (l.start == undefined && item.start == undefined) ||
+                    (l.end == undefined && item.end == undefined) ||
+
+                    (l.start == undefined && l.end >= item.start) ||
+                    (l.end == undefined && l.start <= item.end) ||
+
+                    (item.start == undefined && item.end >= l.start) ||
+                    (item.end == undefined && item.start <= l.end) ||
+
+                    (l.end >= item.start && l.start <= item.end) ||
+                    (l.start >= item.end && l.end <= item.start)
+                )
+
+            let attempt = 0
+            if (clashingLines.length > 0) {
+                let rightmost = 0
+                for (let line of clashingLines) {
+                    let lineRightBound = line.col + line.title.length
+                    if (lineRightBound > rightmost) rightmost = lineRightBound
+                }
+                let max = 30;
+                colloop: for (; (attempt <= rightmost + 1) && (attempt < max); attempt++) {
+                    for (let line of clashingLines) {
+                        if (lineTitleOverlaps(line, item)) {
+                            // funny special case where the label is in the way
+                            if (attempt < line.col + line.title.length ) {
+                                attempt = line.col + line.title.length - 1// -1 to account for ++ in loop
+                                continue colloop
+                            }
+                        }
+                        if (line.col == attempt) {
+                            continue colloop
+                        }
+                    }
+                    break colloop
+                }
+                console.log("placing", item.title, "at col", attempt)
+            }
+
+            item.col = attempt
+            item.type = "head" + ((attempt % 6) + 1)
+            lines.push(item)
+        }
+
+        function rowToHtml(date) {
+            let activeLines = lines.filter(line =>
+            (line.start == undefined && line.end >= date) ||
+            (line.end == undefined && line.start <= date) ||
+            (line.start <= date && date <= line.end)
+            )
+            if (activeLines.length <= 0) return null
+            
+            let rightmost = 0
+            for (let line of activeLines) {
+                if (line.col > rightmost) rightmost = line.col
+            }
+            let span = document.createElement("span")
+            for (let i = 0; i <= rightmost; i++) {
+                let lineHere = activeLines.filter(l => l.col == i)
+                if (lineHere.length > 0) {
+                    let lineSpan = document.createElement("span")
+                    lineSpan.className = lineHere[0].type
+                    lineSpan.innerHTML = lineChar
+                    let isLineStart = (lineHere[0].start && date.getTime() == lineHere[0].start.getTime())
+                    let isLineEnd =   (lineHere[0].end   && date.getTime() == lineHere[0].end.getTime())
+                    if (isLineStart || isLineEnd) {
+                        lineSpan.innerHTML = lineHere[0].title
+                        i += lineHere[0].title.length - 1 // - 1 to account for ++ in loop
+                    }
+                    span.appendChild(lineSpan)
+                } else {
+                    span.appendChild(document.createTextNode(" "))
+                }
+            }
+            return span
+        }
+
+        function getDate(ses) {
+            if (ses == '' || !ses) return undefined
+            if (!ses.includes("-")) return undefined
+            let ded = ses.split("-")
+            return new Date(ded[0], Number(ded[1] - 1), ded[2])
+        }
+        window.onload = function () {
+            fetch('data.txt')
+                .then(response => response.text())
+                .then(data => {
+                    let rows = data.split('\n')
+                    let items = []
+                    for (let line of rows) {
+                        if (!line.includes(";")) continue
+                        let facts = line.split(';')
+                        items.push({
+                            start: getDate(facts[0]),
+                            end: getDate(facts[1]),
+                            title: facts[2]
+                        })
+                    }
+                    shuffleArray(items)
+                    console.log("Read", items.length, "timespans from file.", items)
+                    for (let item of items) {
+                        if (item.start) {
+                            if (earliest) {
+                                if (earliest > item.start) earliest = item.start
+                            } else {
+                                earliest = item.start
+                            }
+                        }
+                        if (item.end) {
+                            if (latest) {
+                                if (latest < item.end) latest = item.end
+                            } else {
+                                latest = item.end
+                            }
+                        }
+                    }
+                    console.log("Earliest point is", earliest, ", latest is", latest)
+                    startDate = new Date(earliest)
+                    startDate.setDate(startDate.getDate() - padding)
+                    endDate = new Date(latest)
+                    endDate.setDate(endDate.getDate() + padding)
+                    let i = 0
+                    for (let item of items) {
+                        registerLine(item)
+                        i += 1
+                    }
+
+                    let sludge = document.querySelector(".sludge")
+                    for (let date = startDate; date <= endDate; date.setDate(date.getDate() + 1)) {
+                        let hoverHelper = document.createElement("div")
+                        hoverHelper.className = "hoverHelper"
+                        sludge.appendChild(hoverHelper)
+                        if (date.getUTCDay() == 0) {
+                            hoverHelper.classList.add("guide")
+                        }
+
+                        let gutter = document.createTextNode(date.toDateString() + " ")
+                        hoverHelper.appendChild(gutter)
+                        let graphics = rowToHtml(date)
+                        if (graphics) hoverHelper.appendChild(graphics)
+                        // graphics.appendChild(document.createTextNode("\n"))
+                        date = new Date(date)
+                    }
+                })
+        }
+    </script>
+    <style>
+        :root {
+            --dark: #54524E;
+            --semidark: #756655;
+            --legend: #C66255;
+            --hover: #9B6E57;
+
+            --color1: #F64D5D;
+            --color2: #ED8075;
+            --color3: #E9AF98;
+            --color4: #E8CFB8;
+            --color5: #EBE3D3;
+            --color6: #F3F2EB;
+        }
+
+        body {
+            background-color: var(--dark);
+            color: var(--legend);
+        }
+
+        .head1,
+        .head2,
+        .head3,
+        .head4,
+        .head5,
+        .head6 {
+            color: #000;
+        }
+
+        .guide {
+            background-color: var(--semidark);
+        }
+        .hoverHelper:hover {
+            background-color: var(--hover);
+        }
+
+        .head1 {
+            background-color: var(--color1);
+        }
+        .head2 {
+            background-color: var(--color2);
+        }
+        .head3 {
+            background-color: var(--color3);
+        }
+        .head4 {
+            background-color: var(--color4);
+        }
+        .head5 {
+            background-color: var(--color5);
+        }
+        .head6 {
+            background-color: var(--color6);
+        }
+        .cool {
+            color: var(--color3);
+        }
+        a:link, a:visited, a:active {
+            color: #000;
+            background-color: #fff;
+        }
+        a:hover {
+            color: #000;
+            background-color: #DEE1A4;
+        }
+    </style>
+</head>
+
+<body>
+    <pre class="cool">
+      ____    __   _  _ 
+   __/ __ \ _/ _\ ( \/ ) tiny calendar for slow movements
+  ( \__  )(/    \ )  (   
+  (__\___/ \_)\_/(_/\_)</pre>
+    <pre class="sludge"></pre>
+</body>
+
+</html>
