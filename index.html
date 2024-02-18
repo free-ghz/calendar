@@ -13,6 +13,7 @@
         let startDate
         let endDate
         let lines = []
+        let rightmostLineColumn = 0
         function shuffleArray(array) {
             for (let i = array.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
@@ -48,13 +49,8 @@
 
             let attempt = 0
             if (clashingLines.length > 0) {
-                let rightmost = 0
-                for (let line of clashingLines) {
-                    let lineRightBound = line.col + line.title.length
-                    if (lineRightBound > rightmost) rightmost = lineRightBound
-                }
                 let max = 30;
-                colloop: for (; (attempt <= rightmost + 1) && (attempt < max); attempt++) {
+                colloop: for (; (attempt <= rightmostLineColumn + 1) && (attempt < max); attempt++) {
                     for (let line of clashingLines) {
                         if (lineTitleOverlaps(line, item)) {
                             // funny special case where the label is in the way
@@ -72,6 +68,10 @@
                 console.log("placing", item.title, "at col", attempt)
             }
 
+            // keep track
+            let rightBound = attempt + item.title.length
+            if (rightBound > rightmostLineColumn) rightmostLineColumn = rightBound
+
             item.col = attempt
             item.type = "head" + ((attempt % 6) + 1)
             lines.push(item)
@@ -83,14 +83,9 @@
             (line.end == undefined && line.start <= date) ||
             (line.start <= date && date <= line.end)
             )
-            if (activeLines.length <= 0) return null
-            
-            let rightmost = 0
-            for (let line of activeLines) {
-                if (line.col > rightmost) rightmost = line.col
-            }
+
             let span = document.createElement("span")
-            for (let i = 0; i <= rightmost; i++) {
+            for (let i = 0; i <= rightmostLineColumn; i++) {
                 let lineHere = activeLines.filter(l => l.col == i)
                 if (lineHere.length > 0) {
                     let lineSpan = document.createElement("span")
