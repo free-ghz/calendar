@@ -93,7 +93,7 @@
                     lineSpan.innerHTML = lineChar
                     let isLineStart = (lineHere[0].start && date.getTime() == lineHere[0].start.getTime())
                     let isLineEnd =   (lineHere[0].end   && date.getTime() == lineHere[0].end.getTime())
-                    if (isLineStart || isLineEnd) {
+                    if (isLineStart || isLineEnd) {
                         lineSpan.innerHTML = lineHere[0].title
                         i += lineHere[0].title.length - 1 // - 1 to account for ++ in loop
                     }
@@ -105,73 +105,134 @@
             return span
         }
 
+        function pointToHtml(point) {
+            let span = document.createElement("span")
+            span.className = "point"
+
+            span.appendChild(document.createTextNode(point.title))
+            if (point.link) {
+                span.appendChild(document.createTextNode(" {"))
+                let a = document.createElement("a")
+                a.href = point.link
+                a.appendChild(document.createTextNode(point.link))
+                span.appendChild(a)
+                span.appendChild(document.createTextNode("}"))
+            }
+
+            return span
+        }
+
         function getDate(ses) {
             if (ses == '' || !ses) return undefined
             if (!ses.includes("-")) return undefined
             let ded = ses.split("-")
             return new Date(ded[0], Number(ded[1] - 1), ded[2])
         }
-        window.onload = function () {
-            fetch('data.txt')
-                .then(response => response.text())
-                .then(data => {
-                    let rows = data.split('\n')
-                    let items = []
-                    for (let line of rows) {
-                        if (!line.includes(";")) continue
-                        let facts = line.split(';')
-                        items.push({
-                            start: getDate(facts[0]),
-                            end: getDate(facts[1]),
-                            title: facts[2]
-                        })
-                    }
-                    shuffleArray(items)
-                    console.log("Read", items.length, "timespans from file.", items)
-                    for (let item of items) {
-                        if (item.start) {
-                            if (earliest) {
-                                if (earliest > item.start) earliest = item.start
-                            } else {
-                                earliest = item.start
-                            }
-                        }
-                        if (item.end) {
-                            if (latest) {
-                                if (latest < item.end) latest = item.end
-                            } else {
-                                latest = item.end
-                            }
-                        }
-                    }
-                    console.log("Earliest point is", earliest, ", latest is", latest)
-                    startDate = new Date(earliest)
-                    startDate.setDate(startDate.getDate() - padding)
-                    endDate = new Date(latest)
-                    endDate.setDate(endDate.getDate() + padding)
-                    let i = 0
-                    for (let item of items) {
-                        registerLine(item)
-                        i += 1
-                    }
-
-                    let sludge = document.querySelector(".sludge")
-                    for (let date = startDate; date <= endDate; date.setDate(date.getDate() + 1)) {
-                        let hoverHelper = document.createElement("div")
-                        hoverHelper.className = "hoverHelper"
-                        sludge.appendChild(hoverHelper)
-                        if (date.getUTCDay() == 0) {
-                            hoverHelper.classList.add("guide")
-                        }
-
-                        let gutter = document.createTextNode(date.toDateString() + " ")
-                        hoverHelper.appendChild(gutter)
-                        let graphics = rowToHtml(date)
-                        if (graphics) hoverHelper.appendChild(graphics)
-                        // graphics.appendChild(document.createTextNode("\n"))
-                        date = new Date(date)
-                    }
+        window.onload = async function () {
+            let lineDefs = await fetch('data.txt')
+            let lineData = await lineDefs.text()
+            let rows = lineData.split('\n')
+            let items = []
+            for (let line of rows) {
+                if (!line.includes(";")) continue
+                let facts = line.split(';')
+                items.push({
+                    start: getDate(facts[0]),
+                    end: getDate(facts[1]),
+                    title: facts[2]
                 })
+            }
+            shuffleArray(items)
+            console.log("Read", items.length, "timespans from file.")
+
+
+            let pointDefs = await fetch('timeline.dat')
+            let pointData = await pointDefs.text()
+            let pointRows = pointData.split('\n')
+            let points = new Map()
+            for (let line of pointRows) {
+                if (line.startsWith(" ")) continue
+                if (line.length == 0) continue
+
+                let date = line.substr(0,10)
+                let rest = line.substr(11)
+                let point = {
+                    at: getDate(date),
+                    title: rest
+                }
+                
+                if (point.title.includes("{")) {
+                    let slices = point.title.split("{")
+                    point.title = slices[0]
+                    point.link = slices[1].substr(0, slices[1].length - 1)
+                }
+                points.set(point.at.getTime(), point)
+            }
+            console.log("Read", points.size, "timepoints from file.")
+
+
+            for (let item of items) {
+                if (item.start) {
+                    if (earliest) {
+                        if (earliest > item.start) earliest = item.start
+                    } else {
+                        earliest = item.start
+                    }
+                }
+                if (item.end) {
+                    if (latest) {
+                        if (latest < item.end) latest = item.end
+                    } else {
+                        latest = item.end
+                    }
+                }
+            }
+            for (let point of points) {
+                let item = point[1]
+                if (earliest) {
+                    if (earliest > item.at) earliest = item.at
+                } else {
+                    earliest = item.at
+                }
+                if (latest) {
+                    if (latest < item.at) latest = item.at
+                } else {
+                    latest = item.at
+                }
+            }
+            console.log("Earliest point is", earliest, ", latest is", latest)
+            startDate = new Date(earliest)
+            startDate.setDate(startDate.getDate() - padding)
+            endDate = new Date(latest)
+            endDate.setDate(endDate.getDate() + padding)
+            let i = 0
+            for (let item of items) {
+                registerLine(item)
+                i += 1
+            }
+
+            let sludge = document.querySelector(".sludge")
+            for (let date = startDate; date <= endDate; date.setDate(date.getDate() + 1)) {
+                let hoverHelper = document.createElement("div")
+                hoverHelper.className = "hoverHelper"
+                sludge.appendChild(hoverHelper)
+                if (date.getUTCDay() == 0) {
+                    hoverHelper.classList.add("guide")
+                }
+
+                let gutter = document.createTextNode(date.toDateString() + " ")
+                hoverHelper.appendChild(gutter)
+
+                let lineRender = rowToHtml(date)
+                if (lineRender) hoverHelper.appendChild(lineRender)
+
+                let point = points.get(date.getTime())
+                if (point) {
+                    hoverHelper.appendChild(pointToHtml(point))
+                }
+
+                date = new Date(date)
+            }
         }
     </script>
     <style>
@@ -228,7 +289,7 @@
         .head6 {
             background-color: var(--color6);
         }
-        .cool {
+        .cool, .point {
             color: var(--color3);
         }
         a:link, a:visited, a:active {
@@ -238,6 +299,16 @@
         a:hover {
             color: #000;
             background-color: #DEE1A4;
+        }
+        .point a:link, .point a:visited, .point a:active {
+            color: var(--color3);
+            background: none;
+            text-decoration: underline;
+        }
+        .point a:hover {
+            color: var(--color6);
+            background: none;
+            text-decoration: underline;
         }
     </style>
 </head>
